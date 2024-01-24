@@ -1,4 +1,3 @@
-
 func! Limit(value, min, max) abort
     return a:value >= a:min ? (a:value <= a:max ? a:value : a:max) : a:min
 endfunc
@@ -56,21 +55,6 @@ func! RGB2HSL(r, g, b) abort
     endif
 
     return [l:hue, l:saturation, l:lightness]
-endfunc
-
-
-func! GetColor(hue, tmp1, tmp2) abort
-    if a:hue * 6.0 < 1.0
-        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * 6.0 * a:hue
-    elseif a:hue * 2.0 < 1.0
-        let l:value = a:tmp1
-    elseif a:hue * 3.0 < 2.0
-        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * (0.666 - a:hue) * 6.0
-    else
-        let l:value = a:tmp2
-    endif
-
-    return Limit(l:value * 255.0, 0.0, 255.0)
 endfunc
 
 
