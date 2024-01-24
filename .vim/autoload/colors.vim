@@ -1,171 +1,242 @@
-" Helper functions for working with Vim color schemes.
 
-function colors#rgb_to_hex(r, g, b) abort
-    let l:result = printf("#%02X%02X%02X", float2nr(a:r), float2nr(a:g), float2nr(a:b))
-    return l:result
-endfunction
+func! Limit(value, min, max) abort
+    return a:value >= a:min ? (a:value <= a:max ? a:value : a:max) : a:min
+endfunc
 
-function colors#hex_to_rgb(hex) abort
-    let l:rgb = [
-                \ str2nr(strpart(a:hex, 1, 2), 16),
-                \ str2nr(strpart(a:hex, 3, 2), 16),
-                \ str2nr(strpart(a:hex, 5, 2), 16)
+
+" Calculating Hue from RGB:
+"   https://stackoverflow.com/a/39147465
+" The Difference Between Chroma and Saturation:
+"   https://munsell.com/color-blog/difference-chroma-saturation/
+func! RGB2HSL(r, g, b) abort
+    " Scale the RGB values to fill the [0,1] interval.
+    let [l:red, l:green, l:blue] = [
+                \   Limit(a:r / 255.0, 0.0, 1.0),
+                \   Limit(a:g / 255.0, 0.0, 1.0),
+                \   Limit(a:b / 255.0, 0.0, 1.0),
                 \ ]
-    return l:rgb
-endfunction
 
-function colors#hex_to_hsl(hex) abort
-    " Lightness {{{
+    let l:sorted = sort([l:red, l:green, l:blue], 'f')
+    let [l:min, l:max] = [l:sorted[0], l:sorted[-1]]
+    let l:chroma = l:max - l:min
 
-    let [l:red, l:green, l:blue] = colors#hex_to_rgb(a:hex)
-    let l:sorted_iter = sort([l:red, l:green, l:blue], 'f')
+    " Lightness is the average of the smallest and largest color component.
+    let l:lightness = (l:min + l:max) / 2.0
 
-    " Convert `number` to `float` for more accurate calculations.
-    let l:min = l:sorted_iter[0] + 0.0
-    let l:max = l:sorted_iter[-1] + 0.0
-
-    let l:value = ((l:min + l:max) / 255.0) / 2.0
-    let l:lightness = l:value
-
-    " }}}
-
-    " Saturation {{{
-
-    if l:min == l:max
-        let l:value = 0
+    if l:chroma == 0
+        let l:saturation = 0
     else
-        if l:lightness <= 0.5
-            let l:value = (l:max - l:min) / (l:max + l:min)
-        else
-            " 500 is the sum of possible values between `min` and `max`
-            let l:value = (l:max - l:min) / (500.0 - l:max - l:min)
-        endif
+        let l:saturation = l:chroma / (1.0 - abs(2.0 * l:lightness - 1.0))
     endif
 
-    let l:saturation = l:value
-    unlet l:value
-
-    " }}}
-
-    " Hue {{{
-
-    if l:saturation == 0
-        let l:value = 0  " The color is a shade of gray.
+    if l:chroma == 0
+        let l:hue = 0
     else
+
         if l:max == l:red
-            let l:value = (l:green - l:blue) / (l:max - l:min)
+            let l:segment = (l:green - l:blue) / l:chroma
+            let l:shift = 0.0 / 60.0  " R° / (360° / hex sides)
+
+            if (l:segment < 0.0)  " hue > 180, full rotation
+                let l:shift = 360.0 / 60.0
+            endif
+
+            let l:hue = l:segment + l:shift
         elseif l:max == l:green
-            let l:value = 500.0 + (l:blue - l:green) / (l:max - l:min)
+            let l:segment = (l:blue - l:red) / l:chroma
+            let l:shift = 120.0 / 60.0  " G° / (360° / hex sides)
+            let l:hue = l:segment + l:shift
         elseif l:max == l:blue
-            let l:value = 1000.0 + (l:red - l:green) / (l:max - l:min)
-        else
-            throw 'ERROR(Unreachable): `max` should be one of the RGB values'
+            let l:segment = (l:red - l:green) / l:chroma
+            let l:shift = 240.0 / 60.0  " B° / (360° / hex sides)
+            let l:hue = l:segment + l:shift
         endif
+
+        let l:hue = l:hue * 60  " Hue is in [0,6], scale it up
     endif
-
-    let l:value = l:value * 60  " Convert to degrees
-
-    while l:value < 0
-        let l:value = l:value + 360.0
-    endwhile
-
-    while l:value > 360
-        let l:value = l:value - 360.0
-    endwhile
-
-    let l:hue = l:value
-    unlet l:value
-
-    " }}}
 
     return [l:hue, l:saturation, l:lightness]
-endfunction
+endfunc
 
-function GetColor(c, tmp1, tmp2) abort
-    if a:c * 6 < 1
-        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * 6 * a:c
-    elseif a:c * 2 < 1
+
+func! GetColor(hue, tmp1, tmp2) abort
+    if a:hue * 6.0 < 1.0
+        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * 6.0 * a:hue
+    elseif a:hue * 2.0 < 1.0
         let l:value = a:tmp1
-    elseif a:c * 3 < 2
-        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * (0.666 - a:c) * 6
+    elseif a:hue * 3.0 < 2.0
+        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * (0.666 - a:hue) * 6.0
     else
         let l:value = a:tmp2
     endif
 
-    return float2nr(l:value * 255.0)
-endfunction
+    return Limit(l:value * 255.0, 0.0, 255.0)
+endfunc
 
-function colors#hsl_to_rgb(h, s, l) abort
-    if a:s == 0
-        " No saturation indicates the color is a shade of gray;
-        " set red, green, and blue to the same value.
-        "
-        " Important: Assumes `h` is between 0 and 1.
-        let l:value = a:s * 255
-        return [l:value, l:value, l:value]
-    endif
 
-    " Important: Assumes `l` is between 0 and 1.
-    if a:l < 0.5
-        let l:tmp1 = a:l * (1.0 + a:s)
+func! ValidateColor(color) abort
+    return Limit(a:color, 0.0, 255.0)
+endfunc
+
+
+func! ValidateTempColor(color) abort
+    let l:value = a:color
+
+    while l:value > 1.0
+        let l:value -= 1.0
+    endwhile
+
+    while l:value < 0
+        let l:value += 1.0
+    endwhile
+
+    return l:value
+endfunc
+
+
+func! GetColor(hue, tmp1, tmp2) abort
+    if a:hue * 6.0 < 1.0
+        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * 6.0 * a:hue
+    elseif a:hue * 2.0 < 1.0
+        let l:value = a:tmp1
+    elseif a:hue * 3.0 < 2.0
+        let l:value = a:tmp2 + (a:tmp1 - a:tmp2) * (0.666 - a:hue) * 6.0
     else
-        let l:tmp1 = a:l + a:s - (a:l * a:s)
+        let l:value = a:tmp2
     endif
 
-    let l:tmp2 = (2.0 * a:l) - l:tmp1
+    return ValidateColor(l:value * 255.0)
+endfunc
 
-    " Important: Assumes `h` is between 0 and 360.
-    let l:hue = a:h / 360  " Convert degree to decimal between 0 and 1.
 
-    let l:tmp_r = l:hue + 0.333
-    let l:tmp_g = l:hue
-    let l:tmp_b = l:hue - 0.333
+func! HSL2RGB(h, s, l) abort
+    let [l:hue, l:saturation, l:lightness] = ValidateHSL(a:h, a:s, a:l)
 
-    let l:red = GetColor(l:tmp_r, l:tmp1, l:tmp2)
-    let l:green = GetColor(l:tmp_g, l:tmp1, l:tmp2)
-    let l:blue = GetColor(l:tmp_b, l:tmp1, l:tmp2)
+    if l:saturation == 0.0  " Indicates the value is a shade of gray.
+        let l:color = l:lightness * 255.0
+        return [l:color, l:color, l:color]
+    endif
 
-    return [l:red, l:green, l:blue]
-endfunction
+    " Adjust the lightness based on the saturation.
+    if l:lightness < 0.5
+        let l:tmp1 = l:lightness * (1.0 + l:saturation)
+    else
+        let l:tmp1 = l:lightness + l:saturation - (l:lightness * l:saturation)
+    endif
 
-function! Limit(x, min, max) abort
-    return a:x >= a:min ? (a:x <= a:max ? a:x : a:max) : a:min
-endfunction
+    let l:tmp2 = (2.0 * l:lightness) - l:tmp1
 
-function colors#adjust(hex, options) abort
-    let [l:hue, l:saturation, l:lightness] = colors#hex_to_hsl(a:hex)
+    let l:hue = l:hue / 360.0  " Scale degrees to fit in [0,1]
 
-    let l:hue += get(a:options, "hue", 0)
-    let l:saturation += get(a:options, "saturation", 0) / 100.0
-    let l:lightness += get(a:options, "lightness", 0) / 100.0
+    " Shift hue to their respective point in the color wheel.
+    let l:tmp_r = ValidateTempColor(l:hue + 0.333)
+    let l:tmp_g = ValidateTempColor(l:hue)
+    let l:tmp_b = ValidateTempColor(l:hue - 0.333)
 
-    let l:hue = Limit(l:hue, 0.0, 360.0)
-    let l:saturation = Limit(l:saturation, 0.0, 1.0)
-    let l:lightness = Limit(l:lightness, 0.0, 1.0)
+    let l:rgb = []
 
-    let [l:r, l:g, l:b] = colors#hsl_to_rgb(l:hue, l:saturation, l:lightness)
-
-    " Ensure RGB are valid values
-    let l:r = Limit(l:r, 0.0, 255.0)
-    let l:g = Limit(l:g, 0.0, 255.0)
-    let l:b = Limit(l:b, 0.0, 255.0)
-
-    return colors#rgb_to_hex(l:r, l:g, l:b)
-endfunction
-
-" For debugging while making color schemes.
-function! SynStack ()
-    for i1 in synstack(line("."), col("."))
-        let i2 = synIDtrans(i1)
-        let n1 = synIDattr(i1, "name")
-        let n2 = synIDattr(i2, "name")
-        echo n1 "->" n2
+    for hue in [l:tmp_r, l:tmp_g, l:tmp_b]
+        let l:rgb = add(l:rgb, GetColor(hue, l:tmp1, l:tmp2))
     endfor
-endfunction
 
-nmap gm :call SynStack()<cr>
+    return l:rgb
+endfunc
 
-function! Highlight(group, cterm, ctermbg, ctermfg, guibg, guifg, guisp)
+
+func! RGB2Hex(r, g, b) abort
+    let l:hex = printf(
+                \   "#%02X%02X%02X",
+                \   float2nr(a:r),
+                \   float2nr(a:g),
+                \   float2nr(a:b)
+                \ )
+    return l:hex
+endfunc
+
+
+func! ValidateHue(hue) abort
+    let l:value = a:hue
+
+    while l:value > 360.0
+        let l:value -= 360.0
+    endwhile
+
+    while l:value < 0.0
+        let l:value += 360.0
+    endwhile
+
+    return Limit(l:value, 0.0, 360.0)
+endfunc
+
+
+func! ValidateSaturation(saturation) abort
+    return Limit(a:saturation, 0.0, 1.0)
+endfunc
+
+
+func! ValidateLightness(lightness) abort
+    return Limit(a:lightness, 0.0, 1.0)
+endfunc
+
+
+func! ValidateHSL(h, s, l) abort
+    return [
+                \   ValidateHue(a:h),
+                \   ValidateSaturation(a:s),
+                \   ValidateLightness(a:l),
+                \ ]
+endfunc
+
+
+func! colors#hsl(h, s, l) abort
+    let [l:hue, l:saturation, l:lightness] = ValidateHSL(a:h, a:s, a:l)
+    let [l:red, l:green, l:blue] = HSL2RGB(l:hue, l:saturation, l:lightness)
+    return RGB2Hex(l:red, l:green, l:blue)
+endfunc
+
+
+func! ValidateRGB(r, g, b) abort
+    return [ValidateColor(a:r), ValidateColor(a:g), ValidateColor(a:b)]
+endfunc
+
+
+func! colors#rgb(r, g, b) abort
+    let [l:red, l:green, l:blue] = ValidateRGB(a:r, a:g, a:b)
+    return RGB2Hex(l:red, l:green, l:blue)
+endfunc
+
+
+func! Hex2RGB(hex) abort
+    let l:values = [
+                \   str2nr(strpart(a:hex, 1, 2), 16),
+                \   str2nr(strpart(a:hex, 3, 2), 16),
+                \   str2nr(strpart(a:hex, 5, 2), 16),
+                \ ]
+    return l:values
+endfunc
+
+
+func! colors#adjust(hex, options) abort
+    let [l:red, l:green, l:blue] = Hex2RGB(a:hex)
+    let [l:hue, l:saturation, l:lightness] = RGB2HSL(l:red, l:green, l:blue)
+
+    let l:hue = ValidateHue(
+                \   l:hue + get(a:options, 'hue', 0.0)
+                \ )
+    let l:saturation = ValidateSaturation(
+                \   l:saturation + get(a:options, 'saturation', 0.0)
+                \ )
+    let l:lightness = ValidateLightness(
+                \   l:lightness + get(a:options, 'lightness', 0.0)
+                \ )
+
+    let [l:red, l:green, l:blue] = HSL2RGB(l:hue, l:saturation, l:lightness)
+    let l:hex = RGB2Hex(l:red, l:green, l:blue)
+    return l:hex
+endfunc
+
+
+func! Highlight(group, cterm, ctermbg, ctermfg, guibg, guifg, guisp) abort
     if a:cterm != ""
         exec "hi " . a:group . " cterm=" . a:cterm
     endif
@@ -189,18 +260,32 @@ function! Highlight(group, cterm, ctermbg, ctermfg, guibg, guifg, guisp)
     if a:guisp != ""
         exec "hi " . a:group . " guisp=" . a:guisp
     endif
-endfunction
+endfunc
 
-function! colors#update(groups)
+
+func! colors#update_theme(groups) abort
     for group in keys(a:groups)
         call Highlight(
-                    \ group,
-                    \ get(a:groups[group], 'cterm', ""),
-                    \ get(a:groups[group], 'ctermbg', ""),
-                    \ get(a:groups[group], 'ctermfg', ""),
-                    \ get(a:groups[group], 'guibg', ""),
-                    \ get(a:groups[group], 'guifg', ""),
-                    \ get(a:groups[group], 'guisp', ""),
+                    \   group,
+                    \   get(a:groups[group], 'cterm', ''),
+                    \   get(a:groups[group], 'ctermbg', ''),
+                    \   get(a:groups[group], 'ctermfg', ''),
+                    \   get(a:groups[group], 'guibg', ''),
+                    \   get(a:groups[group], 'guifg', ''),
+                    \   get(a:groups[group], 'guisp', ''),
                     \ )
     endfor
-endfunction
+endfunc
+
+" For Debugging {{{
+func! SynStack() abort
+    for i1 in synstack(line('.'), col('.'))
+        let i2 = synIDtrans(i1)
+        let n1 = synIDattr(i1, "name")
+        let n2 = synIDattr(i2, "name")
+        echo n1 "->" n2
+    endfor
+endfunc
+
+nmap <leader>gm :call SynStack()<cr>
+" }}}

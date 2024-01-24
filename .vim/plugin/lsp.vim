@@ -1,3 +1,7 @@
+if has('nvim')
+    finish
+endif
+
 if executable('pylsp')
     " pip install python-lsp-server
     au User lsp_setup call lsp#register_server({

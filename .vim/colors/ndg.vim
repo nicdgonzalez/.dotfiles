@@ -1,158 +1,153 @@
-" @nicdgonzalez's Custom color scheme for Vim (WIP)
-"
-" My previous theme was Github Dark themed, so I temporarily recreated it here.
-" This currently (partially) covers the most basic highlight groups.
-"
-" This file depends on:
-"   * .vim/autoload/colors.vim -- Contains color-adjustment helper functions.
-
 if &t_Co < 256 && !has('gui_running')
-    finish  " Terminal does not support 256 colors and not using gVim.
+    finish  " Terminal does not support 256 colors and not using gVim
 endif
 
 let g:colors_name = 'ndg'
 
-let palette = {}
+func! GetPalette(hue) abort
+    " I know you can't just increment lightness alone to create a palette.
+    " I understand the concept, but I have not implemented it yet.
+    return {
+                \   '050': colors#hsl(a:hue, 0.50, 0.95),
+                \   '100': colors#hsl(a:hue, 0.50, 0.90),
+                \   '200': colors#hsl(a:hue, 0.50, 0.80),
+                \   '300': colors#hsl(a:hue, 0.50, 0.70),
+                \   '400': colors#hsl(a:hue, 0.50, 0.60),
+                \   '500': colors#hsl(a:hue, 0.50, 0.50),
+                \   '600': colors#hsl(a:hue, 0.50, 0.40),
+                \   '700': colors#hsl(a:hue, 0.50, 0.30),
+                \   '800': colors#hsl(a:hue, 0.50, 0.20),
+                \   '900': colors#hsl(a:hue, 0.50, 0.10),
+                \   '950': colors#hsl(a:hue, 0.50, 0.05),
+                \ }
+endfunc
 
-let palette.White = '#eeeeee'       " Foreground
-let palette.Red = '#ff7b72'         " Diff Remove
-let palette.LightRed = '#ff7b72'    " Keywords
-let palette.Orange = '#ffa657'      " Variables
-let palette.LightGreen = '#7ee787'  " Escaped Characters
-let palette.Green = '#3fb950'       " Diff Add
-let palette.Turquoise = '#62bcb3'   " Fold Column
-let palette.LightBlue = '#a5d6ff'   " Strings
-let palette.Blue = '#79c0ff'        " Constants
-let palette.DarkBlue = '#0e1319'    " Background
-let palette.Purple = '#d2a8ff'      " Matching Parenthesis
-let palette.Gray = '#8b949e'        " Comments
+let hue_red = 0
+let hue_orange = 30
+let hue_cyan = 175
+let hue_blue = 210
+let hue_purple = 270
 
-" The following colors are dependent on the background
-let palette.Background = colors#adjust(palette.DarkBlue, {})
-let palette.BackAccent = colors#adjust(
-            \   palette.Background,
-            \   {'lightness': 5}
-            \ )
-let palette.LineNr = colors#adjust(palette.Background, {'lightness': 75})
-let palette.LineNrAbove = colors#adjust(
-            \   palette.Background,
-            \   {'saturation': -5, 'lightness': 23}
-            \ )
+let hue_base = 210
 
-let C = {}
+let red = GetPalette(0)
+let orange = GetPalette(30)
+let cyan = GetPalette(175)
+let blue = GetPalette(210)
+let purple = GetPalette(270)
 
-" Display {{{
+let g = {}
 
-" For the background color and any non-highlighted text.
-let C.Normal = {'guibg': palette.Background, 'guifg': palette.White}
-
-" The nth column on the right-hand side when `colorcolumn` is set.
-let C.ColorColumn = {'guibg': palette.BackAccent}
-let C.Conceal = {}
-let C.Cursor = {}
-let C.lCursor = {}
-let C.CursorIM = {}
-
-" When the cursor hovers on a word, matching words across the file get
-" highlighted as well. This is the related group:
-let C.CursorColumn = {
-            \   'guifg': palette.White,
-            \   'guibg': colors#adjust(
-            \       palette.DarkBlue,
-            \       {'saturation': +10, 'lightness': 20}
-            \   ),
+" See `:help highlight-groups`
+let g.normal = {
+            \   'guibg': blue.950,
+            \   'guifg': blue.050
             \ }
-
-" The current line when browsing the file tree.
-let C.CursorLine = {
-            \   'guibg': palette.BackAccent,
+let g.colorcolumn = {
+            \   'guibg': red.600
+            \ }
+let g.linenr = {
+            \   'guibg': g.normal.guibg,
+            \   'guifg': g.normal.guifg
+            \ }
+let g.linenrabove = {
+            \   'guibg': g.linenr.guibg,
+            \   'guifg': colors#adjust(blue.700, {'saturation': -0.30}),
+            \ }
+let g.linenrbelow = g.linenrabove
+let g.folded = {
+            \   'guibg': g.linenrabove.guibg,
+            \   'guifg': colors#hsl(hue_cyan, 0.7, 0.50),
+            \ }
+let g.foldcolumn = g.folded
+let g.matchparen = {
+            \   'guibg': 'NONE',
+            \   'guifg': colors#hsl(hue_blue, 0.5, 0.5),
+            \ }
+let g.pmenu = {
+            \   'guibg': colors#adjust(g.normal.guibg, {
+            \       'lightness': +0.03,
+            \   })
+            \ }
+let g.statusline = {
+            \   'cterm': 'NONE',
+            \   'guibg': blue.800,
+            \   'guifg': g.normal.guifg,
+            \ }
+let g.statuslinenc = {
+            \   'cterm': 'NONE',
+            \   'guibg': blue.900,
+            \   'guifg': g.normal.guifg,
+            \ }
+let g.signcolumn = {
+            \   'guibg': g.linenrabove.guibg,
+            \ }
+let g.vertsplit = {
+            \   'cterm': 'NONE',
+            \   'guibg': 'NONE',
+            \   'guifg': g.statuslinenc.guifg,
+            \ }
+let g.cursorcolumn = {
+            \   'guibg': colors#adjust(g.normal.guibg, {
+            \       'saturation': +0.10,
+            \       'lightness': +0.20,
+            \   }),
+            \   'guifg': g.normal.guifg,
+            \ }
+let g.cursorline = {
+            \   'cterm': 'NONE',
+            \   'guibg': blue.900,
             \   'guifg': 'NONE',
+            \ }
+let g.directory = {
+            \   'guibg': 'NONE',
+            \   'guifg': colors#hsl(hue_base, 0.85, 0.70),
+            \ }
+let g.endofbuffer = g.normal
+let g.visual = g.cursorcolumn
+
+
+let g.comment = {
             \   'cterm': 'NONE',
+            \   'guifg': colors#adjust(blue.400, {'saturation': -0.40}),
+            \ }
+let g.constant = {
+            \   'guifg': colors#adjust(blue.300, {'saturation': +0.50}),
+            \ }
+let g.string = {
+            \   'guifg': colors#adjust(blue.200, {'saturation': +0.50}),
+            \ }
+let g.identifier = {
+            \   'cterm': 'NONE',
+            \   'guifg': g.normal.guifg,
+            \ }
+let g.special = {
+            \   'guifg': colors#hsl(hue_base, 0.8, 0.93),
+            \ }
+let g.title = {'guifg': orange.500}
+let g.preproc = {
+            \   'guifg': colors#hsl(hue_base, 0.85, 0.7),
+            \ }
+let g.statement = g.preproc
+let g.todo = {
+            \   'guibg': 'NONE',
+            \   'guifg': colors#hsl(hue_red, 0.85, 0.65),
+            \ }
+let g.type = {
+            \   'guifg': colors#hsl(hue_orange, 1.0, 0.67),
             \ }
 
-" Colors the directories in the file tree.
-let C.Directory = {'guibg': 'NONE', 'guifg': palette.LightBlue}
-
-let C.DiffAdd = {'guibg': palette.Green, 'guifg': palette.White}
-let C.DiffChange = {}
-let C.DiffDelete = {
+let g.pythonBuiltin = g.constant
+let g.pythonDecorator = {
             \   'cterm': 'NONE',
-            \   'guibg': palette.Red,
-            \   'guifg': palette.White
+            \   'guifg': colors#hsl(hue_purple, 1.0, 0.83),
             \ }
-let C.DiffText = {}
-let C.EndOfBuffer = {'guibg': C.Normal.guibg, 'guifg': palette.White}
-let C.ErrorMsg = {}
-let C.VertSplit = {'cterm': 'NONE', 'guibg': 'NONE', 'guifg': palette.White}
-
-let C.Folded = {'guibg': C.CursorLine.guibg, 'guifg': palette.Turquoise}
-let C.FoldColumn = {'guibg': palette.BackAccent, 'guifg': palette.Turquoise}
-
-let C.SignColumn = C.FoldColumn
-let C.IncSearch = {}
-let C.LineNr = {'guibg': C.FoldColumn.guibg, 'guifg': palette.LineNr}
-let C.LineNrAbove = {'guibg': C.LineNr.guibg, 'guifg': palette.LineNrAbove}
-let C.LineNrBelow = C.LineNrAbove
-let C.CursorLineNr = {}
-let C.MatchParen = {'guibg': 'NONE', 'guifg': palette.Red}
-let C.ModeMsg = {}
-let C.MoreMsg = {}
-let C.NonText = {}
-let C.Pmenu = {'guibg': palette.BackAccent}
-let C.PmenuSel = {}
-let C.PmenuSbar = {}
-let C.PmenuThumb = {}
-let C.Question = {}
-let C.QuickFixLine = {}
-let C.Search = {}
-let C.SpecialKey = {}
-let C.SpellBad = {}
-let C.SpellCap = {}
-let C.SpellLocal = {}
-let C.SpellRare = {}
-let C.StatusLine = {
+let g.pythonDecoratorName = g.pythonDecorator
+let g.pythonFunction = {
             \   'cterm': 'NONE',
-            \   'guibg': colors#adjust(palette.Background, {'lightness': +10}),
-            \   'guifg': palette.White,
+            \   'guifg': colors#hsl(hue_purple, 1.0, 0.83),
             \ }
-let C.StatusLineNC = {
-            \   'cterm': 'NONE',
-            \   'guibg': colors#adjust(palette.Background, {'lightness': 5}),
-            \   'guifg': palette.White,
-            \ }
-let C.StatusLineTerm = C.StatusLine
-let C.StatusLineTermNC = C.StatusLineNC
-let C.TabLine = {}
-let C.TabLineFill = {}
-let C.TabLineSel = {}
-let C.Terminal = {}
-let C.Title = {'guifg': palette.Orange}
-
-" For the selected text in Visual mode.
-let C.Visual = C.CursorColumn
-let C.VisualNOS = {}
-let C.WildMenu = {}
 " }}}
 
-" Generic Syntax {{{
-let C.Comment = {'guifg': palette.Gray}
-let C.Constant = {'guifg': palette.Blue}
-let C.Error = {}
-let C.String = {'guifg': palette.LightBlue}
-let C.Identifier = {'guifg': palette.Orange, 'cterm': 'NONE'}
-let C.PreProc = {'guifg': palette.LightRed}
-let C.Special = {'guifg': palette.White}
-let C.Statement = C.PreProc
-let C.Todo = {'guibg': 'NONE', 'guifg': palette.Red}
-let C.ToolbarLine = {}
-let C.ToolbarButton = {}
-let C.Type = {'guifg': palette.Orange}
-let C.Underlined = {}
-" }}}
 
-" netrw {{{
-let C.netrwSymlink = {'guifg': palette.Purple}
-let C.netrwClassify = {'guifg': palette.Purple}
-" }}}
-
-call colors#update(C)
+call colors#update_theme(g)
